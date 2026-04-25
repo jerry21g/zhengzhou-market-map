@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管城回族区各办事处范围图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; }
+  #map-container { width: 100%; height: 100%; }
+  
+  #legend {
+    position: absolute; top: 12px; right: 12px; z-index: 9999;
+    background: #fff; padding: 16px 20px; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 210px;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  #legend h3 {
+    font-size: 15px; color: #1a73e8; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 2px solid #e8f0fe;
+  }
+  .legend-item {
+    display: flex; align-items: center; padding: 6px 4px;
+    font-size: 12px; color: #444; cursor: pointer;
+    transition: all 0.2s; border-radius: 4px;
+  }
+  .legend-item:hover { color: #1a73e8; background: #f5f7fa; transform: translateX(3px); }
+  .legend-color {
+    width: 22px; height: 14px; border-radius: 3px;
+    margin-right: 8px; flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .legend-count {
+    margin-left: auto; background: #e8f0fe; color: #1a73e8;
+    border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: bold;
+  }
+  
+  #info-panel {
+    display: none; position: absolute; top: 12px; left: 12px; z-index: 9999;
+    background: #fff; padding: 18px 22px; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); max-width: 360px;
+  }
+  #info-panel .close-btn {
+    position: absolute; top: 8px; right: 12px;
+    font-size: 18px; color: #aaa; cursor: pointer; line-height: 1;
+  }
+  #info-panel .close-btn:hover { color: #333; }
+  #info-panel h4 { font-size: 15px; color: #1a73e8; margin-bottom: 8px; padding-right: 20px; }
+  #info-panel p { font-size: 12px; color: #666; margin: 4px 0; line-height: 1.6; }
+  #info-panel .market-list { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; }
+  #info-panel .market-tag {
+    display: inline-block; background: #e8f0fe; color: #1a73e8;
+    padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 2px;
+  }
+
+  #stats-bar {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 9999; background: linear-gradient(135deg, #1a73e8, #4285f4);
+    color: #fff; padding: 10px 24px; border-radius: 24px;
+    font-size: 13px; box-shadow: 0 4px 12px rgba(26,115,232,0.4);
+    letter-spacing: 0.5px;
+  }
+  #stats-bar b { font-size: 16px; }
+
+  #loading {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    z-index: 99999; background: #fff; padding: 24px 36px; border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2); font-size: 14px; color: #666; text-align: center;
+  }
+  #loading .spinner {
+    width: 32px; height: 32px; border: 3px solid #e8f0fe;
+    border-top-color: #1a73e8; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tab-bar {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 9999; display: flex; gap: 0;
+    border-radius: 24px; overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .tab-btn {
+    padding: 8px 20px; font-size: 13px; cursor: pointer;
+    border: none; background: #fff; color: #666;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .tab-btn.active { background: #1a73e8; color: #fff; }
+  .tab-btn:hover:not(.active) { background: #e8f0fe; }
+</style>
+</head>
+<body>
+<div id="map-container"></div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  正在加载办事处边界数据...
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchView('boundary')">办事处范围</button>
+  <button class="tab-btn" onclick="switchView('market')">市场标注</button>
+</div>
+
+<div id="legend">
+  <h3>🏛️ 管城回族区各办事处</h3>
+  <div id="legend-list"></div>
+</div>
+
+<div id="info-panel">
+  <span class="close-btn" onclick="document.getElementById('info-panel').style.display='none'">✕</span>
+  <h4 id="info-name"></h4>
+  <p id="info-markets"></p>
+  <div class="market-list" id="info-market-list"></div>
+</div>
+
+<div id="stats-bar">管城回族区 · <b>11</b> 个办事处 · <b>33</b> 个专业市场 + <b>22</b> 个农贸市场</div>
+
+<script src="https://map.qq.com/api/gljs?v=1.exp&key=7AEBZ-PNJKU-QS3VW-G4AOJ-OIANT-7HFQD&libraries=district"></script>
+<script>
+(function() {
+  // ============= 办事处配置 =============
+  var officeConfig = [
+    { id: 'nanguan',     name: '南关办事处',     color: '#D32F2F', shortName: '南关',
+      markets: ['郑州中部大观商业管理有限公司','豫泰通讯城','锦荣商贸城','郑州通讯新天地','银基广场','郑州世贸购物中心','中原美博城','海天商贸城'] },
+    { id: 'beixiajie',   name: '北下街办事处',   color: '#7B1FA2', shortName: '北下街',
+      markets: ['天达光彩','鸿成光彩'] },
+    { id: 'dongdajie',   name: '东大街办事处',   color: '#1976D2', shortName: '东大街',
+      markets: ['郑汴路家电城'] },
+    { id: 'erligang',    name: '二里岗办事处',   color: '#388E3C', shortName: '二里岗',
+      markets: ['燃气具市场','郑州厨具市场','中博家具中心','中博厨具','裕丰国际酒店用品城','裕宝建材展示仓','中原电动车航母城'] },
+    { id: 'chengdonglu', name: '城东路办事处',   color: '#F57C00', shortName: '城东路',
+      markets: ['未来城农贸市场'] },
+    { id: 'hangdonglu',  name: '航东路办事处',   color: '#0097A7', shortName: '航东路',
+      markets: ['安徐庄便民生活广场','汇美茶城','城东参茸中药材卖场'] },
+    { id: 'zinan',       name: '紫南办事处',     color: '#C2185B', shortName: '紫南',
+      markets: ['中原茶城','金城街农贸市场','嘉禾润园市场','腾盛智慧农贸市场'] },
+    { id: 'jindai',      name: '金岱办事处',     color: '#EF6C00', shortName: '金岱',
+      markets: ['卫浴线下体验园','金岱五金机电','军诚电商园','国香茶城','泓佳茶城'] },
+    { id: 'nancao',      name: '南曹办事处',     color: '#00796B', shortName: '南曹',
+      markets: ['南曹农贸市场','河南绿旺花卉交易中心'] },
+    { id: 'shibalihe',   name: '十八里河办事处', color: '#512DA8', shortName: '十八里河',
+      markets: ['金岱工程机械电子商务创业园','万盟电商园','九一机电','百荣世贸商城'] },
+    { id: 'longhai',     name: '陇海马路办事处', color: '#6D4C41', shortName: '陇海马路',
+      markets: ['汽配一条街'] }
+  ];
+
+  // ============= 办事处边界坐标（基于公开行政区划数据近似绘制）============
+  var officeBoundaries = {
+    'nanguan': [
+      [113.656,34.730],[113.663,34.727],[113.672,34.729],[113.680,34.732],
+      [113.680,34.738],[113.678,34.744],[113.676,34.748],[113.672,34.751],
+      [113.666,34.752],[113.661,34.749],[113.657,34.745],[113.655,34.740],
+      [113.656,34.730]
+    ],
+    'beixiajie': [
+      [113.672,34.751],[113.676,34.748],[113.682,34.750],[113.684,34.754],
+      [113.682,34.758],[113.676,34.760],[113.672,34.757],[113.670,34.754],
+      [113.672,34.751]
+    ],
+    'dongdajie': [
+      [113.682,34.750],[113.688,34.748],[113.693,34.750],[113.692,34.756],
+      [113.686,34.757],[113.682,34.756],[113.682,34.750]
+    ],
+    'erligang': [
+      [113.680,34.732],[113.690,34.728],[113.700,34.730],[113.702,34.736],
+      [113.700,34.742],[113.694,34.744],[113.688,34.748],[113.682,34.750],
+      [113.680,34.744],[113.680,34.738],[113.680,34.732]
+    ],
+    'chengdonglu': [
+      [113.694,34.744],[113.700,34.742],[113.706,34.744],[113.708,34.750],
+      [113.704,34.756],[113.698,34.757],[113.692,34.756],[113.694,34.750],
+      [113.694,34.744]
+    ],
+    'hangdonglu': [
+      [113.695,34.708],[113.704,34.704],[113.714,34.706],[113.716,34.714],
+      [113.710,34.720],[113.702,34.720],[113.696,34.716],[113.695,34.708]
+    ],
+    'zinan': [
+      [113.676,34.712],[113.686,34.708],[113.695,34.710],[113.696,34.718],
+      [113.692,34.726],[113.686,34.730],[113.680,34.728],[113.676,34.722],
+      [113.676,34.712]
+    ],
+    'jindai': [
+      [113.716,34.684],[113.726,34.680],[113.736,34.686],[113.736,34.696],
+      [113.730,34.704],[113.720,34.706],[113.716,34.700],[113.712,34.692],
+      [113.716,34.684]
+    ],
+    'nancao': [
+      [113.742,34.654],[113.760,34.650],[113.780,34.656],[113.784,34.670],
+      [113.770,34.678],[113.752,34.676],[113.742,34.668],[113.742,34.654]
+    ],
+    'shibalihe': [
+      [113.678,34.658],[113.694,34.652],[113.714,34.654],[113.720,34.666],
+      [113.716,34.680],[113.702,34.682],[113.688,34.678],[113.678,34.668],
+      [113.678,34.658]
+    ],
+    'longhai': [
+      [113.676,34.722],[113.686,34.720],[113.692,34.724],[113.692,34.730],
+      [113.688,34.734],[113.682,34.736],[113.678,34.734],[113.676,34.728],
+      [113.676,34.722]
+    ]
+  };
+
+  // ============= 专业市场坐标 =============
+  var marketPoints = [
+    {seq:1,  name:'郑州中部大观商业管理有限公司', office:'nanguan', lng:113.66997, lat:34.74399},
+    {seq:2,  name:'豫泰通讯城',   office:'nanguan', lng:113.67112, lat:34.74084},
+    {seq:3,  name:'锦荣商贸城',   office:'nanguan', lng:113.66765, lat:34.73876},
+    {seq:4,  name:'郑州通讯新天地', office:'nanguan', lng:113.67341, lat:34.74295},
+    {seq:5,  name:'银基广场',     office:'nanguan', lng:113.67212, lat:34.74587},
+    {seq:6,  name:'郑州世贸购物中心', office:'nanguan', lng:113.67034, lat:34.74421},
+    {seq:7,  name:'中原美博城',   office:'nanguan', lng:113.67428, lat:34.73972},
+    {seq:8,  name:'海天商贸城',   office:'nanguan', lng:113.66873, lat:34.73899},
+    {seq:9,  name:'燃气具市场',   office:'erligang', lng:113.69241, lat:34.73523},
+    {seq:10, name:'郑州厨具市场',  office:'erligang', lng:113.69335, lat:34.73612},
+    {seq:11, name:'中博家具中心',  office:'erligang', lng:113.69589, lat:34.73721},
+    {seq:12, name:'中博厨具',     office:'erligang', lng:113.69412, lat:34.73655},
+    {seq:13, name:'裕丰国际酒店用品城', office:'erligang', lng:113.69735, lat:34.73418},
+    {seq:14, name:'郑汴路家电城',  office:'dongdajie', lng:113.68812, lat:34.74823},
+    {seq:15, name:'裕宝建材展示仓', office:'erligang', lng:113.69123, lat:34.73345},
+    {seq:16, name:'中原电动车航母城', office:'erligang', lng:113.69523, lat:34.73455},
+    {seq:17, name:'天达光彩',     office:'beixiajie', lng:113.67923, lat:34.75312},
+    {seq:18, name:'鸿成光彩',     office:'beixiajie', lng:113.68112, lat:34.75412},
+    {seq:19, name:'安徐庄便民生活广场', office:'hangdonglu', lng:113.70128, lat:34.71490},
+    {seq:20, name:'中原茶城',     office:'zinan', lng:113.68712, lat:34.72223},
+    {seq:21, name:'汇美茶城',     office:'hangdonglu', lng:113.70523, lat:34.71012},
+    {seq:22, name:'城东参茸中药材卖场', office:'hangdonglu', lng:113.70612, lat:34.70823},
+    {seq:23, name:'卫浴线下体验园', office:'jindai', lng:113.72212, lat:34.69212},
+    {seq:24, name:'金岱五金机电',  office:'jindai', lng:113.71834, lat:34.69323},
+    {seq:25, name:'军诚电商园',    office:'jindai', lng:113.72023, lat:34.69412},
+    {seq:26, name:'国香茶城',     office:'jindai', lng:113.72412, lat:34.69623},
+    {seq:27, name:'泓佳茶城',     office:'jindai', lng:113.72123, lat:34.69512},
+    {seq:28, name:'河南绿旺花卉交易中心', office:'nancao', lng:113.76286, lat:34.66819},
+    {seq:29, name:'金岱工程机械电子商务创业园', office:'shibalihe', lng:113.71023, lat:34.67012},
+    {seq:30, name:'万盟电商园',    office:'shibalihe', lng:113.69823, lat:34.66612},
+    {seq:31, name:'九一机电',     office:'shibalihe', lng:113.70212, lat:34.66723},
+    {seq:32, name:'百荣世贸商城C', office:'shibalihe', lng:113.71023, lat:34.65323},
+    {seq:33, name:'百荣世贸商城ABD', office:'shibalihe', lng:113.71234, lat:34.65212}
+  ];
+
+  // ============= 初始化地图 =============
+  var map = new TMap.Map('map-container', {
+    center: new TMap.LatLng(34.72, 113.69),
+    zoom: 13,
+    pitch: 10
+  });
+
+  var polygonLayers = [];
+  var markerLayers = [];
+  var labelLayers = [];
+  var currentView = 'boundary';
+
+  // ============= 绘制办事处边界 =============
+  function drawBoundaries() {
+    officeConfig.forEach(function(office) {
+      var coords = officeBoundaries[office.id];
+      if (!coords) return;
+
+      var paths = coords.map(function(c) {
+        return new TMap.LatLng(c[1], c[0]);
+      });
+
+      // 计算中心点
+      var centerLat = 0, centerLng = 0;
+      coords.forEach(function(c) { centerLat += c[1]; centerLng += c[0]; });
+      centerLat /= coords.length;
+      centerLng /= coords.length;
+
+      // 绘制多边形
+      var polygon = new TMap.MultiPolygon({
+        map: map,
+        styles: {
+          'pstyle': new TMap.PolygonStyle({
+            color: office.color + '40',
+            showBorder: true,
+            borderColor: office.color,
+            borderWidth: 3
+          })
+        },
+        geometries: [{
+          id: 'poly_' + office.id,
+          styleId: 'pstyle',
+          paths: [paths]
+        }]
+      });
+      polygonLayers.push(polygon);
+
+      // 办事处名称标签
+      var label = new TMap.MultiLabel({
+        map: map,
+        styles: {
+          'olabel': new TMap.LabelStyle({
+            color: office.color,
+            size: 14,
+            backgroundColor: 'rgba(255,255,255,0.92)',
+            borderColor: office.color,
+            borderWidth: 2,
+            padding: { top: 4, right: 10, bottom: 4, left: 10 }
+          })
+        },
+        geometries: [{
+          id: 'lbl_' + office.id,
+          styleId: 'olabel',
+          position: new TMap.LatLng(centerLat, centerLng),
+          content: office.shortName
+        }]
+      });
+      labelLayers.push(label);
+    });
+  }
+
+  // ============= 绘制市场标注 =============
+  function drawMarkers() {
+    // 按办事处分组创建marker
+    var groupMap = {};
+    marketPoints.forEach(function(m) {
+      if (!groupMap[m.office]) groupMap[m.office] = [];
+      groupMap[m.office].push(m);
+    });
+
+    Object.keys(groupMap).forEach(function(officeId) {
+      var office = officeConfig.find(function(o) { return o.id === officeId; });
+      if (!office) return;
+      var color = office.color;
+      var iconUrl = makeMarkerIcon(color);
+      var group = groupMap[officeId];
+
+      var geometries = group.map(function(m, i) {
+        return {
+          id: 'mk_' + officeId + '_' + i,
+          styleId: 'mkstyle_' + officeId,
+          position: new TMap.LatLng(m.lat, m.lng)
+        };
+      });
+
+      var styles = {};
+      styles['mkstyle_' + officeId] = new TMap.MarkerStyle({
+        width: 24, height: 34,
+        anchor: { x: 12, y: 34 },
+        src: iconUrl
+      });
+
+      var ml = new TMap.MultiMarker({
+        map: map,
+        styles: styles,
+        geometries: geometries
+      });
+      markerLayers.push(ml);
+    });
+
+    // 市场名称标签
+    var labelGeoms = marketPoints.map(function(m, i) {
+      return {
+        id: 'mlabel_' + i,
+        styleId: 'mlabelstyle',
+        position: new TMap.LatLng(m.lat, m.lng),
+        content: m.name.length > 8 ? m.name.substring(0,8)+'…' : m.name
+      };
+    });
+
+    var lbl = new TMap.MultiLabel({
+      map: map,
+      styles: {
+        'mlabelstyle': new TMap.LabelStyle({
+          color: '#333', size: 10,
+          backgroundColor: 'rgba(255,255,255,0.85)',
+          borderColor: '#ddd', borderWidth: 1,
+          padding: { top: 1, right: 4, bottom: 1, left: 4 }
+        })
+      },
+      geometries: labelGeoms
+    });
+    labelLayers.push(lbl);
+  }
+
+  function makeMarkerIcon(color) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="34" viewBox="0 0 24 34">' +
+      '<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 22 12 22s12-13 12-22C24 5.4 18.6 0 12 0z" fill="' + color + '"/>' +
+      '<circle cx="12" cy="12" r="5" fill="white"/>' +
+      '</svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  // ============= 构建图例 =============
+  function buildLegend() {
+    var html = '';
+    officeConfig.forEach(function(office) {
+      var count = office.markets.length;
+      html += '<div class="legend-item" onclick="focusOffice(\'' + office.id + '\')">' +
+        '<span class="legend-color" style="background:' + office.color + '40;border-color:' + office.color + '"></span>' +
+        '<span>' + office.name + '</span>' +
+        '<span class="legend-count">' + count + '</span></div>';
+    });
+    document.getElementById('legend-list').innerHTML = html;
+  }
+
+  // ============= 地图加载完成后初始化 =============
+  var initialized = false;
+  map.on('tilesloaded', function() {
+    if (initialized) return;
+    initialized = true;
+    drawBoundaries();
+    buildLegend();
+    document.getElementById('loading').style.display = 'none';
+  });
+
+  // ============= 点击交互 =============
+  map.on('click', function(evt) {
+    var lat = evt.latLng.lat, lng = evt.latLng.lng;
+    var found = null;
+    Object.keys(officeBoundaries).forEach(function(id) {
+      if (pointInPolygon(lng, lat, officeBoundaries[id])) {
+        var o = officeConfig.find(function(x) { return x.id === id; });
+        if (o) found = o;
+      }
+    });
+    if (found) {
+      showInfo(found);
+    } else {
+      document.getElementById('info-panel').style.display = 'none';
+    }
+  });
+
+  function pointInPolygon(x, y, poly) {
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var xi = poly[i][0], yi = poly[i][1];
+      var xj = poly[j][0], yj = poly[j][1];
+      var intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function showInfo(office) {
+    document.getElementById('info-name').textContent = office.name;
+    document.getElementById('info-name').style.color = office.color;
+    document.getElementById('info-markets').textContent = '🏪 市场数量：' + office.markets.length + '个';
+    var listHtml = '';
+    office.markets.forEach(function(m) {
+      listHtml += '<span class="market-tag" style="background:' + office.color + '15;color:' + office.color + '">' + m + '</span>';
+    });
+    document.getElementById('info-market-list').innerHTML = listHtml;
+    document.getElementById('info-panel').style.display = 'block';
+  }
+
+  // ============= 定位办事处 =============
+  window.focusOffice = function(id) {
+    var coords = officeBoundaries[id];
+    if (!coords) return;
+    var centerLat = 0, centerLng = 0;
+    coords.forEach(function(c) { centerLat += c[1]; centerLng += c[0]; });
+    centerLat /= coords.length;
+    centerLng /= coords.length;
+    map.setCenter(new TMap.LatLng(centerLat, centerLng));
+    map.setZoom(14);
+  };
+
+  // ============= 视图切换 =============
+  window.switchView = function(view) {
+    currentView = view;
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    if (view === 'boundary') {
+      document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      // 显示边界，隐藏市场标注
+      polygonLayers.forEach(function(p) { p.setMap(map); });
+      labelLayers.forEach(function(l) { /* 只保留办事处名标签 */ });
+      markerLayers.forEach(function(m) { m.setMap(null); });
+    } else {
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      // 显示边界+市场标注
+      polygonLayers.forEach(function(p) { p.setMap(map); });
+      markerLayers.forEach(function(m) { m.setMap(map); });
+      // 首次切换时绘制市场
+      if (markerLayers.length === 0) drawMarkers();
+    }
+  };
+
+})();
+</script>
+</body>
+</html>
