@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>郑州市行政区划图</title>
+    <script src="https://map.qq.com/api/gljs?v=1.exp&key=7AEBZ-PNJKU-QS3VW-G4AOJ-OIANT-7HFQD"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f2f5; }
+        #header {
+            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #1565c0 100%);
+            color: #fff; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        #header h1 { font-size: 20px; font-weight: 600; letter-spacing: 2px; }
+        #header .subtitle { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+        #main { display: flex; height: calc(100vh - 52px); }
+        #map-container { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
+        
+        /* 左侧图例面板 */
+        #legend-panel {
+            width: 240px; background: #fff; overflow-y: auto; border-left: 1px solid #e0e0e0;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        }
+        #legend-panel h3 {
+            padding: 14px 16px; font-size: 15px; background: #f5f5f5;
+            border-bottom: 2px solid #1a237e; color: #1a237e;
+        }
+        .legend-section { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .legend-section-title {
+            padding: 6px 16px; font-size: 13px; font-weight: 600; color: #333;
+            background: #fafafa;
+        }
+        .legend-item {
+            display: flex; align-items: center; padding: 8px 16px; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .legend-item:hover { background: #e3f2fd; }
+        .legend-item.active { background: #bbdefb; }
+        .legend-color {
+            width: 20px; height: 20px; border-radius: 4px; margin-right: 10px;
+            border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0;
+        }
+        .legend-label { font-size: 13px; color: #333; }
+        .legend-label small { color: #888; font-size: 11px; }
+        
+        /* 信息窗口 */
+        .info-window {
+            background: #fff; border-radius: 8px; padding: 16px; min-width: 220px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2); font-size: 13px;
+        }
+        .info-window h4 {
+            font-size: 16px; color: #1a237e; margin-bottom: 8px;
+            padding-bottom: 6px; border-bottom: 2px solid #1a237e;
+        }
+        .info-window .row { display: flex; justify-content: space-between; margin: 4px 0; }
+        .info-window .label { color: #666; }
+        .info-window .value { font-weight: 600; color: #333; }
+        .info-window .desc { margin-top: 8px; color: #555; line-height: 1.5; }
+        
+        /* 统计条 */
+        #stats-bar {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15); display: flex; gap: 24px;
+            font-size: 13px; z-index: 10;
+        }
+        .stat-item { text-align: center; }
+        .stat-item .num { font-size: 20px; font-weight: 700; color: #1a237e; }
+        .stat-item .lbl { font-size: 11px; color: #888; }
+        
+        /* 搜索框 */
+        #search-box {
+            position: absolute; top: 16px; left: 16px; z-index: 10;
+        }
+        #search-box input {
+            width: 240px; padding: 10px 14px; border: none; border-radius: 8px;
+            font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            outline: none;
+        }
+        #search-box input:focus { box-shadow: 0 2px 12px rgba(26,35,126,0.3); }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div>
+            <h1>🏛️ 郑州市行政区划图</h1>
+            <div class="subtitle">6区 · 5县 · 1市 ｜ 总面积 7,567 km²</div>
+        </div>
+        <div style="font-size:12px; opacity:0.7;">数据来源：公开行政区划信息</div>
+    </div>
+    <div id="main">
+        <div id="map-container">
+            <div id="search-box">
+                <input type="text" id="search-input" placeholder="搜索区县名称..." oninput="searchDistrict(this.value)">
+            </div>
+            <div id="map"></div>
+            <div id="stats-bar">
+                <div class="stat-item"><div class="num">12</div><div class="lbl">区县总数</div></div>
+                <div class="stat-item"><div class="num">6</div><div class="lbl">市辖区</div></div>
+                <div class="stat-item"><div class="num">5</div><div class="lbl">县</div></div>
+                <div class="stat-item"><div class="num">1</div><div class="lbl">县级市</div></div>
+                <div class="stat-item"><div class="num">1,280万</div><div class="lbl">常住人口</div></div>
+            </div>
+        </div>
+        <div id="legend-panel">
+            <h3>📋 区县图例</h3>
+            <div class="legend-section">
+                <div class="legend-section-title">🏢 市辖区（6个）</div>
+                <div id="legend-urban"></div>
+            </div>
+            <div class="legend-section">
+                <div class="legend-section-title">🏔️ 县（5个）</div>
+                <div id="legend-county"></div>
+            </div>
+            <div class="legend-section">
+                <div class="legend-section-title">🏙️ 县级市（1个）</div>
+                <div id="legend-city"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // 郑州市各区县数据：名称、中心坐标、边界多边形、颜色、面积、人口、类型
+    const districts = [
+        {
+            name: '中原区', type: '市辖区', color: '#E53935', area: 195, population: 96,
+            center: [113.613, 34.748],
+            desc: '郑州市委市政府所在地，政治中心',
+            boundary: [
+                [113.57,34.72],[113.58,34.74],[113.59,34.76],[113.60,34.78],[113.61,34.79],
+                [113.63,34.79],[113.65,34.78],[113.67,34.77],[113.68,34.76],[113.68,34.74],
+                [113.67,34.72],[113.66,34.71],[113.64,34.70],[113.62,34.70],[113.60,34.71],
+                [113.58,34.71],[113.57,34.72]
+            ]
+        },
+        {
+            name: '二七区', type: '市辖区', color: '#8E24AA', area: 159, population: 85,
+            center: [113.640, 34.723],
+            desc: '郑州火车站所在地，商贸中心',
+            boundary: [
+                [113.61,34.70],[113.62,34.71],[113.63,34.70],[113.65,34.70],[113.66,34.71],
+                [113.67,34.72],[113.68,34.71],[113.68,34.69],[113.67,34.67],[113.66,34.66],
+                [113.64,34.65],[113.62,34.65],[113.61,34.66],[113.60,34.68],[113.60,34.70],
+                [113.61,34.70]
+            ]
+        },
+        {
+            name: '管城回族区', type: '市辖区', color: '#1E88E5', area: 204, population: 82,
+            center: [113.677, 34.724],
+            desc: '商代遗址所在地，专业市场集聚区',
+            boundary: [
+                [113.67,34.72],[113.68,34.74],[113.69,34.75],[113.71,34.76],[113.73,34.76],
+                [113.75,34.75],[113.76,34.74],[113.76,34.72],[113.75,34.70],[113.74,34.69],
+                [113.72,34.68],[113.70,34.68],[113.69,34.69],[113.68,34.70],[113.67,34.72]
+            ]
+        },
+        {
+            name: '金水区', type: '市辖区', color: '#43A047', area: 136, population: 161,
+            center: [113.660, 34.800],
+            desc: '河南省府所在地，经济最强区',
+            boundary: [
+                [113.61,34.79],[113.63,34.80],[113.65,34.81],[113.67,34.81],[113.69,34.81],
+                [113.71,34.80],[113.72,34.79],[113.72,34.77],[113.71,34.76],[113.69,34.75],
+                [113.68,34.76],[113.67,34.77],[113.65,34.78],[113.63,34.79],[113.61,34.79]
+            ]
+        },
+        {
+            name: '上街区', type: '市辖区', color: '#FB8C00', area: 65, population: 15,
+            center: [113.449, 34.802],
+            desc: '铝工业基地，独立工矿区',
+            boundary: [
+                [113.42,34.79],[113.43,34.80],[113.44,34.81],[113.46,34.82],[113.47,34.82],
+                [113.48,34.81],[113.48,34.80],[113.47,34.79],[113.46,34.78],[113.44,34.78],
+                [113.42,34.79]
+            ]
+        },
+        {
+            name: '惠济区', type: '市辖区', color: '#00ACC1', area: 233, population: 73,
+            center: [113.620, 34.868],
+            desc: '黄河生态核心区，花园口所在地',
+            boundary: [
+                [113.55,34.85],[113.57,34.86],[113.59,34.88],[113.61,34.90],[113.63,34.91],
+                [113.65,34.91],[113.67,34.90],[113.69,34.89],[113.71,34.88],[113.72,34.86],
+                [113.71,34.84],[113.70,34.83],[113.68,34.82],[113.66,34.81],[113.64,34.81],
+                [113.62,34.82],[113.60,34.83],[113.58,34.84],[113.55,34.85]
+            ]
+        },
+        {
+            name: '中牟县', type: '县', color: '#7CB342', area: 1393, population: 71,
+            center: [113.976, 34.719],
+            desc: '郑汴一体化核心区，绿博园/电影小镇/只有河南',
+            boundary: [
+                [113.76,34.74],[113.78,34.76],[113.80,34.78],[113.83,34.80],[113.86,34.81],
+                [113.90,34.82],[113.94,34.82],[113.98,34.82],[114.02,34.81],[114.06,34.80],
+                [114.10,34.78],[114.12,34.76],[114.14,34.74],[114.14,34.72],[114.12,34.70],
+                [114.10,34.68],[114.06,34.66],[114.02,34.65],[113.98,34.65],[113.94,34.66],
+                [113.90,34.67],[113.86,34.68],[113.83,34.70],[113.80,34.72],[113.78,34.73],
+                [113.76,34.74]
+            ]
+        },
+        {
+            name: '巩义市', type: '县级市', color: '#FFB300', area: 1041, population: 84,
+            center: [112.973, 34.748],
+            desc: '全国百强县，宋陵文化遗产地',
+            boundary: [
+                [112.82,34.72],[112.84,34.74],[112.86,34.76],[112.89,34.78],[112.92,34.80],
+                [112.95,34.81],[112.98,34.82],[113.01,34.81],[113.04,34.80],[113.06,34.78],
+                [113.07,34.76],[113.07,34.74],[113.06,34.72],[113.04,34.70],[113.01,34.68],
+                [112.98,34.67],[112.95,34.68],[112.92,34.69],[112.89,34.70],[112.86,34.71],
+                [112.84,34.71],[112.82,34.72]
+            ]
+        },
+        {
+            name: '荥阳市', type: '县', color: '#5C6BC0', area: 908, population: 73,
+            center: [113.383, 34.790],
+            desc: '象棋文化之乡，高铁西站所在地',
+            boundary: [
+                [113.26,34.76],[113.28,34.78],[113.30,34.80],[113.33,34.82],[113.36,34.83],
+                [113.39,34.84],[113.42,34.84],[113.45,34.83],[113.47,34.82],[113.49,34.80],
+                [113.50,34.78],[113.50,34.76],[113.49,34.74],[113.47,34.72],[113.45,34.71],
+                [113.42,34.70],[113.39,34.70],[113.36,34.71],[113.33,34.72],[113.30,34.74],
+                [113.28,34.75],[113.26,34.76]
+            ]
+        },
+        {
+            name: '新密市', type: '县', color: '#26A69A', area: 1001, population: 83,
+            center: [113.390, 34.539],
+            desc: '密玉产地，伏羲山景区',
+            boundary: [
+                [113.28,34.48],[113.30,34.50],[113.33,34.52],[113.36,34.54],[113.39,34.55],
+                [113.42,34.55],[113.45,34.54],[113.47,34.52],[113.49,34.50],[113.49,34.48],
+                [113.48,34.46],[113.46,34.44],[113.43,34.43],[113.40,34.43],[113.37,34.44],
+                [113.34,34.45],[113.31,34.46],[113.28,34.48]
+            ]
+        },
+        {
+            name: '新郑市', type: '县', color: '#EC407A', area: 873, population: 100,
+            center: [113.736, 34.396],
+            desc: '黄帝故里，郑州新郑国际机场所在地',
+            boundary: [
+                [113.62,34.34],[113.65,34.36],[113.68,34.37],[113.71,34.38],[113.74,34.39],
+                [113.77,34.39],[113.80,34.39],[113.83,34.38],[113.85,34.37],[113.87,34.35],
+                [113.87,34.33],[113.85,34.31],[113.82,34.30],[113.79,34.29],[113.76,34.29],
+                [113.73,34.30],[113.70,34.31],[113.67,34.32],[113.64,34.33],[113.62,34.34]
+            ]
+        },
+        {
+            name: '登封市', type: '县', color: '#78909C', area: 1220, population: 73,
+            center: [113.050, 34.457],
+            desc: '少林寺/嵩山/天地之中世界文化遗产',
+            boundary: [
+                [112.92,34.40],[112.94,34.42],[112.96,34.44],[112.99,34.46],[113.02,34.47],
+                [113.05,34.48],[113.08,34.48],[113.11,34.47],[113.13,34.45],[113.14,34.43],
+                [113.14,34.41],[113.12,34.39],[113.10,34.37],[113.07,34.36],[113.04,34.36],
+                [113.01,34.37],[112.98,34.38],[112.95,34.39],[112.92,34.40]
+            ]
+        }
+    ];
+
+    // 初始化地图
+    const map = new TMap.Map('map', {
+        center: new TMap.LatLng(34.75, 113.65),
+        zoom: 10,
+        mapStyleId: 'style1'  // 经典样式
+    });
+
+    // 存储多边形和标签
+    const polygons = [];
+    const labels = [];
+    const infoWindows = {};
+
+    // 创建区划多边形
+    districts.forEach((d, idx) => {
+        // 构建边界路径
+        const paths = d.boundary.map(p => new TMap.LatLng(p[1], p[0]));
+        
+        // 创建多边形
+        const polygon = new TMap.MultiPolygon({
+            map: map,
+            geometries: [{
+                id: d.name,
+                styleId: 'district_' + idx,
+                paths: [paths]
+            }],
+            styles: {
+                ['district_' + idx]: new TMap.PolygonStyle({
+                    color: d.color + '55',       // 半透明填充
+                    showBorder: true,
+                    borderColor: d.color,
+                    borderWidth: 3
+                })
+            }
+        });
+        polygons.push({ polygon, district: d });
+
+        // 创建区名标签
+        const label = new TMap.MultiLabel({
+            map: map,
+            geometries: [{
+                id: 'label_' + idx,
+                position: new TMap.LatLng(d.center[1], d.center[0]),
+            }],
+            styles: {
+                'label_style': new TMap.LabelStyle({
+                    color: '#fff',
+                    size: 14,
+                    backgroundColor: d.color + 'CC',
+                    borderColor: d.color,
+                    borderWidth: 2,
+                    padding: { top: 4, right: 8, bottom: 4, left: 8 },
+                    borderRadius: 4,
+                    text: d.name
+                })
+            }
+        });
+        labels.push(label);
+
+        // 创建信息窗口
+        const infoWin = new TMap.InfoWindow({
+            map: map,
+            position: new TMap.LatLng(d.center[1], d.center[0]),
+            content: `
+                <div class="info-window">
+                    <h4 style="border-color:${d.color}">${d.name}</h4>
+                    <div class="row"><span class="label">类型</span><span class="value">${d.type}</span></div>
+                    <div class="row"><span class="label">面积</span><span class="value">${d.area} km²</span></div>
+                    <div class="row"><span class="label">常住人口</span><span class="value">约${d.population}万</span></div>
+                    <div class="desc">${d.desc}</div>
+                </div>
+            `,
+            visible: false
+        });
+        infoWindows[d.name] = infoWin;
+    });
+
+    // 点击多边形显示信息
+    map.on('click', (e) => {
+        // 隐藏所有信息窗口
+        Object.values(infoWindows).forEach(w => w.set({ visible: false }));
+        
+        // 检查点击位置是否在某个区域内
+        const clickLat = e.latLng.getLat();
+        const clickLng = e.latLng.getLng();
+        
+        let found = null;
+        districts.forEach(d => {
+            if (isPointInPolygon(clickLng, clickLat, d.boundary)) {
+                found = d;
+            }
+        });
+        
+        if (found) {
+            infoWindows[found.name].set({ visible: true });
+            // 高亮图例
+            document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+            const legendEl = document.querySelector(`[data-district="${found.name}"]`);
+            if (legendEl) legendEl.classList.add('active');
+        }
+    });
+
+    // 点在多边形内判断
+    function isPointInPolygon(x, y, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i][0], yi = polygon[i][1];
+            const xj = polygon[j][0], yj = polygon[j][1];
+            const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    // 生成图例
+    function buildLegend() {
+        const urbanContainer = document.getElementById('legend-urban');
+        const countyContainer = document.getElementById('legend-county');
+        const cityContainer = document.getElementById('legend-city');
+
+        districts.forEach(d => {
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            item.setAttribute('data-district', d.name);
+            item.innerHTML = `
+                <div class="legend-color" style="background:${d.color}55; border-color:${d.color}"></div>
+                <div class="legend-label">${d.name} <small>${d.area}km² ${d.population}万人</small></div>
+            `;
+            item.onclick = () => flyTo(d);
+            
+            if (d.type === '市辖区') urbanContainer.appendChild(item);
+            else if (d.type === '县级市') cityContainer.appendChild(item);
+            else countyContainer.appendChild(item);
+        });
+    }
+
+    // 飞到指定区
+    function flyTo(d) {
+        map.setCenter(new TMap.LatLng(d.center[1], d.center[0]));
+        map.setZoom(12);
+        
+        // 显示信息窗口
+        Object.values(infoWindows).forEach(w => w.set({ visible: false }));
+        setTimeout(() => {
+            infoWindows[d.name].set({ visible: true });
+        }, 500);
+
+        // 高亮图例
+        document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+        const legendEl = document.querySelector(`[data-district="${d.name}"]`);
+        if (legendEl) legendEl.classList.add('active');
+    }
+
+    // 搜索功能
+    function searchDistrict(keyword) {
+        if (!keyword) {
+            document.querySelectorAll('.legend-item').forEach(el => el.style.display = 'flex');
+            return;
+        }
+        document.querySelectorAll('.legend-item').forEach(el => {
+            const name = el.getAttribute('data-district');
+            if (name.includes(keyword)) {
+                el.style.display = 'flex';
+                el.classList.add('active');
+            } else {
+                el.style.display = 'none';
+                el.classList.remove('active');
+            }
+        });
+    }
+
+    // 初始化
+    buildLegend();
+
+    // 3秒后自动放大到中心区域
+    setTimeout(() => {
+        map.setZoom(10);
+    }, 1000);
+    </script>
+</body>
+</html>
